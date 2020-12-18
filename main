@@ -1,42 +1,55 @@
 import torch
 import soundfile as sf
 from univoc import Vocoder
-from tacotron import load_cmudict, text_to_id, Tacotron
+from tacotron import load_cmudict
 import matplotlib.pyplot as plt
-from IPython.display import Audio
+import librosa.display
+import numpy as np
+
 
 # download pretrained weights (and optionally move to GPU)
 vocoder = Vocoder.from_pretrained(
     "https://github.com/bshall/UniversalVocoding/releases/download/v0.2/univoc-ljspeech-7mtpaq.pt"
 ).cuda()
 
-tacotron = Tacotron.from_pretrained(
-    "https://github.com/bshall/Tacotron/releases/download/v0.1/tacotron-ljspeech-yspjx3.pt"
-).cuda()
-
 # Load CMU Pronunciation Dictionary and add pronunciation of "PyTorch"
 cmudict = load_cmudict()
 cmudict["PYTORCH"] = "P AY1 T AO2 R CH"
 
-# Text to be synthesized
+# TODO: synthesize text given mel-spectrogram
 text = "A PyTorch implementation of location-relative attention mechanisms for long-form speech synthesis."
 
-# load log-Mel spectrogram from file
-# mel = ...
+# loading wav file
+filename = './data/LJ001-0001.wav'
+wav, sr = librosa.load(filename)
+
+# Generating Mel-Spectrogram
+# TODO: adjust params to mimic natural speed and pitch
+n_fft, n_mels, ref_db, top_db = 1024, 80, 20, 80
+mel = librosa.feature.melspectrogram(
+        librosa.effects.preemphasis(wav, coef=0.97),
+        sr=sr, hop_length=200, win_length=800,
+        n_fft=n_fft, n_mels=n_mels, fmin=50,
+        norm=1, power=1,
+    )
+logmel = librosa.amplitude_to_db(mel, top_db=None) - ref_db
+logmel = np.maximum(logmel, -top_db)
+mel_ = logmel / top_db
+
+mel = torch.tensor([mel_]).cuda()
 
 # Synthesize the audio and generate waveform
-x = torch.LongTensor(text_to_id(text, cmudict)).unsqueeze(0).cuda()
 with torch.no_grad():
-    mel, alpha = tacotron.generate(x)
     wav, sr = vocoder.generate(mel.transpose(1, 2))
 
-Audio(wav, rate=sr)
-
 # plotting the attention matrix
-plt.imshow(alpha.squeeze().cpu().numpy(), vmin=0, vmax=0.8, origin="lower")
-plt.xlabel("Decoder steps")
-plt.ylabel("Encoder steps")
-plt.savefig('./figures/change_title.png')
+librosa.display.specshow(mel_,
+                         sr=sr, hop_length=10, x_axis='linear')
+plt.ylabel('Mel Filter')
+plt.colorbar()
+plt.title('LJSpeech Mel Spectrogram')
+
+plt.savefig('./figures/LJSpeechMel.png')
 
 # save output
-sf.write(open("./output/test1.wav", 'wb'), wav, sr)
+sf.write(open("output/genLJSpeech_v1d0.wav", 'wb'), wav, sr)
