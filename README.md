@@ -1,4 +1,7 @@
 # UniVocoder
+
+# TODO: upload current code for LJSpeech on both.
+
 A 'Tacoder' implementation for TTS synthesis. In it, I use the Tacotron model to generate mel-spectrograms and then pass that into the generic Vocoder to generate a TTS audio file.
 
 A good entry point into TTS, in my opinion, but there are a few flaws to this combination. In general, its slow  in its training and synthesis and the output is not ideal.
